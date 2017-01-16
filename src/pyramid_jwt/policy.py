@@ -15,7 +15,7 @@ class JWTAuthenticationPolicy(CallbackAuthenticationPolicy):
     def __init__(self, private_key, public_key=None, algorithm='HS512',
             leeway=0, expiration=None, default_claims=None,
             http_header='Authorization', auth_type='JWT',
-            callback=None):
+            callback=None, params_key=None):
         self.private_key = private_key
         self.public_key = public_key if public_key is not None else private_key
         self.algorithm = algorithm
@@ -30,6 +30,7 @@ class JWTAuthenticationPolicy(CallbackAuthenticationPolicy):
         else:
             self.expiration = None
         self.callback = callback
+        self.params_key = params_key
 
     def create_token(self, principal, expiration=None, **claims):
         payload = self.default_claims.copy()
@@ -50,14 +51,17 @@ class JWTAuthenticationPolicy(CallbackAuthenticationPolicy):
         if self.http_header == 'Authorization':
             try:
                 if request.authorization is None:
-                    return {}
+                    token = None
+                else:
+                    (auth_type, token) = request.authorization
+                    if auth_type != self.auth_type:
+                        token = None
             except ValueError:  # Invalid Authorization header
-                return {}
-            (auth_type, token) = request.authorization
-            if auth_type != self.auth_type:
-                return {}
+                token = None
         else:
             token = request.headers.get(self.http_header)
+        if not token and self.params_key:
+            token = request.params.get(self.params_key)
         if not token:
             return {}
         try:
